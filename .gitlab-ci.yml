@@ -1,6 +1,26 @@
 stages:
-  - verify
   - build
-  - dockerpush
-  - deployment
+  - test
 
+cache:
+  key: ${CI_BUILD_REF_NAME}
+  paths:
+    - bin/
+
+build:
+  stage: build
+  only:
+    - main
+  script:
+    - go build -o bin/ hello.go
+  tags:
+    - test
+
+test:
+  stage: test
+  only:
+    - main
+  script:
+    - ./bin/hello
+  tags:
+    - test
