@@ -10,7 +10,7 @@ cache:
 build:
   stage: build
   only:
-    - main
+    - CI/CD
   script:
     - go build -o bin/ hello.go
   tags:
@@ -19,7 +19,7 @@ build:
 test:
   stage: test
   only:
-    - main
+    - CI/CD
   script:
     - ./bin/hello
   tags:
