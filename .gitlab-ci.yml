@@ -1,0 +1,6 @@
+stages:
+  - verify
+  - build
+  - dockerpush
+  - deployment
+
