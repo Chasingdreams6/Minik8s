@@ -1,0 +1,17 @@
+build:
+  stage: build
+  only:
+    - CI/CD
+  script:
+    - go build -o bin/ hello.go
+  tags:
+    - test
+
+test:
+  stage: test
+  only:
+    - CI/CD
+  script:
+    - ./bin/hello
+  tags:
+    - test

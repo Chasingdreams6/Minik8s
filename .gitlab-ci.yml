@@ -7,20 +7,14 @@ cache:
   paths:
     - bin/
 
-build:
-  stage: build
-  only:
-    - CI/CD
-  script:
-    - go build -o bin/ hello.go
+default:
+  image: $DEFAULT_CI_IMAGE
   tags:
     - test
+  # All jobs are interruptible by default
+  interruptible: true
+  # Default job timeout set to 90m https://gitlab.com/gitlab-com/gl-infra/infrastructure/-/issues/10520
+  timeout: 90m
 
-test:
-  stage: test
-  only:
-    - CI/CD
-  script:
-    - ./bin/hello
-  tags:
-    - test
+include:
+  - local: .workflow/*.gitlab-ci.yml
