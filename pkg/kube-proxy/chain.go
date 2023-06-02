@@ -93,7 +93,8 @@ func NewDNatRule(PodIP string,
 
 // 根据pod-Info创建chain, father是service-chain
 func NewPodChain(protocol string, pod PodInfo, table string, father string, rr int, dstIp string, dstPort string) *PodChain {
-	fmt.Println("[chain][NewPodChain]: dstIp:Port=" + dstIp + ":" + dstPort + "PodIP:Port=" + pod.IP + ":" + pod.Port)
+	prefix := "[chain][NewPodChain]"
+	fmt.Println(prefix + " : dstIp:Port=" + dstIp + ":" + dstPort + "PodIP:Port=" + pod.IP + ":" + pod.Port)
 	res := &PodChain{
 		Name:             PodChainPrefix + "-" + pod.Name + pod.Port,
 		Pod:              pod,
@@ -104,17 +105,20 @@ func NewPodChain(protocol string, pod PodInfo, table string, father string, rr i
 	}
 	res.toSpec()
 	ipt, err := iptables.New()
-	if err != nil {
-		panic(err.Error())
+	if err != nil { // may exist before?
+		fmt.Println(prefix + err.Error())
+		//panic(err.Error())
 	}
 	err = ipt.NewChain(table, res.Name)
 	if err != nil {
-		panic(err.Error())
+		fmt.Println(prefix + err.Error())
+		//panic(err.Error())
 	}
 	res.DNatRule = NewDNatRule(pod.IP, pod.Port, nil, nil, protocol, res.Name, &table, dstIp, dstPort)
 	err = res.DNatRule.ApplyRule()
 	if err != nil {
-		panic(err.Error())
+		fmt.Println(prefix + err.Error())
+		//panic(err.Error())
 	}
 	return res
 }
@@ -160,7 +164,8 @@ func DeleteReturnToNAT(father string, table string) {
 
 func NewSvcChain(name string, table string, father string, ip string, port string,
 	protocol string, pods []*PodInfo) *SvcChain {
-	fmt.Println("[chain][NewSvcChain]: sName=" + name + " sIP:port=" + ip + ":" + port + "podNum=" + strconv.Itoa(len(pods)))
+	prefix := "[chain][NewSvcChain]"
+	fmt.Println(prefix + ": sName=" + name + " sIP:port=" + ip + ":" + port + "podNum=" + strconv.Itoa(len(pods)))
 	res := &SvcChain{
 		Name:        SvcChainPrefix + "-" + name + port,
 		Table:       table,
@@ -172,8 +177,10 @@ func NewSvcChain(name string, table string, father string, ip string, port strin
 	res.toSpec()
 	ipt, err := iptables.New()
 	if err != nil {
-		panic(err.Error())
+		fmt.Println(prefix + err.Error())
+		//panic(err.Error())
 	}
+
 	err = ipt.NewChain(table, res.Name)
 	total := 1
 	res.Name2Chain = make(map[string]*PodChain)
@@ -181,7 +188,8 @@ func NewSvcChain(name string, table string, father string, ip string, port strin
 		curChain := NewPodChain(protocol, *val, table, res.Name, total, ip, port)
 		err = curChain.ApplyChain()
 		if err != nil {
-			panic(err.Error())
+			fmt.Println(prefix + err.Error())
+			//panic(err.Error())
 		}
 		total++
 		res.Name2Chain[val.Name] = curChain
@@ -285,7 +293,8 @@ func (chain *SvcChain) DeleteChain() error {
 }
 
 func (chain *SvcChain) UpdateChain(newPods []*PodInfo) {
-	fmt.Println("[chain][SvcChain][UpdateChain]: in")
+	prefix := "[chain][SvcChain][UpdateChain]"
+	fmt.Println(": in")
 	shouldRemain := make(map[string]*PodChain)
 	for k, v := range chain.Name2Chain {
 		flag := false
@@ -300,19 +309,22 @@ func (chain *SvcChain) UpdateChain(newPods []*PodInfo) {
 		} else {
 			err := v.DeleteChain()
 			if err != nil {
-				panic(err.Error())
+				fmt.Println(prefix + err.Error())
+				//panic(err.Error())
 			}
 		}
 	}
 	ipt, err := iptables.New()
 	if err != nil {
-		panic(err.Error())
+		fmt.Println(prefix + err.Error())
+		//panic(err.Error())
 	}
 	// first, delete all previous chain
 	for _, v := range shouldRemain {
 		err = ipt.Delete(v.Table, v.FatherChain, v.Spec...)
 		if err != nil {
-			panic(err.Error())
+			fmt.Println(prefix + err.Error())
+			//panic(err.Error())
 		}
 	}
 	total := 1
@@ -323,14 +335,16 @@ func (chain *SvcChain) UpdateChain(newPods []*PodInfo) {
 			podChain.toSpec()
 			err = ipt.Insert(podChain.Table, podChain.FatherChain, 1, podChain.Spec...)
 			if err != nil {
-				panic(err.Error())
+				fmt.Println(prefix + err.Error())
+				//panic(err.Error())
 			}
 			chain.Name2Chain[pod.Name] = podChain
 		} else { // create new chain
 			podChain = NewPodChain(chain.Protocol, *pod, chain.Table, chain.Name, total, chain.ClusterIp, chain.ClusterPort)
 			err = podChain.ApplyChain()
 			if err != nil {
-				panic(err.Error())
+				fmt.Println(prefix + err.Error())
+				//panic(err.Error())
 			}
 			chain.Name2Chain[pod.Name] = podChain
 		}
@@ -356,17 +370,20 @@ func Init() {
 	AddReturnToNAT("SERVICE", "nat")
 
 	if err != nil {
-		panic(err.Error())
+		fmt.Println(err.Error())
+		//panic(err.Error())
 	}
 	// 增加OUTPUT链
 	err = ipt.Insert("nat", "OUTPUT", 1, "-j", "SERVICE", "-s", "0/0", "-d", "0/0", "-p", "all")
 	if err != nil {
-		panic(err.Error())
+		fmt.Println(err.Error())
+		//panic(err.Error())
 	}
 	// 增加PREROUTING链
 	err = ipt.Insert("nat", "PREROUTING", 1, "-j", "SERVICE", "-s", "0/0", "-d", "0/0", "-p", "all")
 
 	if err != nil {
-		panic(err.Error())
+		fmt.Println(err.Error())
+		//panic(err.Error())
 	}
 }

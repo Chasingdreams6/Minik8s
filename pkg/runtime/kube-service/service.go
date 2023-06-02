@@ -149,7 +149,7 @@ func (rs *RuntimeService) Run(event <-chan string) {
 				fmt.Println("[service][run]: refind pods")
 				err := rs.findPods(false)
 				if err != nil { // 这里直接终止
-					panic(err.Error())
+					continue
 				}
 				rs.ifSend = true
 			default:

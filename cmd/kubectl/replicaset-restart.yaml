@@ -14,8 +14,8 @@ spec:
     spec:
       containers:
         - name: my-container
-          image: nginx:latest
-          command: ["timeout", "30s", "/bin/sh", "-c", "while true; do :; done"]
+          image: chasingdreams/tinyweb:30sfail
+#          command: ["timeout", "30s", "/bin/sh", "-c", "while true; do :; done"]
           resources:
             limits:
               cpu: "1"

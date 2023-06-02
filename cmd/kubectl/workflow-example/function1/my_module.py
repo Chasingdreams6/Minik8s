@@ -1,0 +1,13 @@
+# function1.py
+def function1(event: dict, context: dict)->dict:
+    x = context.get('x')
+    y = context.get('y')
+
+    if x is not None and y is not None:
+        try:
+            result = x + y
+            return {'result': result}
+        except Exception as e:
+            return {'error': str(e)}
+
+    return {'error': 'Invalid input'}

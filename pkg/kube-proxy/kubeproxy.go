@@ -11,7 +11,8 @@ import (
 	kubeservice "minik8s/pkg/service"
 )
 
-func NewKubeProxy() *KubeProxy {
+func NewKubeProxy(masterIP string) *KubeProxy {
+	apiconfig.Server_URL = masterIP
 	res := &KubeProxy{}
 	res.ServiceInformer = informer.NewInformer(apiconfig.SERVICE_PATH)
 	res.ServiceName2SvcChain = make(map[string]map[string]*SvcChain)

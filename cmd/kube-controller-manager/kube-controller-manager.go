@@ -4,7 +4,8 @@ import (
 	"fmt"
 	hpacontroller "minik8s/pkg/kube-controller/hpa-controller"
 	jobcontroller "minik8s/pkg/kube-controller/job-controller"
-	"minik8s/pkg/kube-controller/replicaset-controller"
+	replicaset_controller "minik8s/pkg/kube-controller/replicaset-controller"
+	workflowcontroller "minik8s/pkg/kube-controller/workflow-controller"
 )
 
 func RunReplicaSetController() {
@@ -29,9 +30,16 @@ func RunHpaController() {
 	hpaController.Run()
 }
 
+func RunWorkflowController() {
+	workflowController := workflowcontroller.NewWorkflowController()
+	workflowController.Register()
+	workflowController.Run()
+}
+
 func main() {
 	go RunReplicaSetController()
 	go RunJobController()
 	go RunHpaController()
+	go RunWorkflowController()
 	select {}
 }

@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: replicaset-service
+spec:
+  name: replicaset-service
+  clusterIP: "11.1.1.2"
+  selector:
+    app: "my-app"
+  ports:
+    - port: "80"
+      protocol: tcp
+      targetPort: "80"
+

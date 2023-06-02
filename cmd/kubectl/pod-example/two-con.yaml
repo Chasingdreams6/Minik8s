@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: two-con
+  labels:
+    app: two-con
+spec:
+  containers:
+    - name: server
+      image: chasingdreams/tinyweb:3
+      ports:
+        - name: http
+          containerPort: 80
+    - name: user
+      image: chasingdreams/minor_ubuntu:v3
+      tty: true
+      command: [ "/bin/sh"]
+
+

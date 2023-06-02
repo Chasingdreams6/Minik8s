@@ -26,6 +26,7 @@ func NewJobController() *JobController {
 
 func (jc *JobController) Register() {
 	jc.JobInformer.AddEventHandler(tool.Added, jc.AddJob)
+	jc.JobInformer.AddEventHandler(tool.Deleted, jc.DeleteJob)
 }
 
 func (jc *JobController) AddJob(event tool.Event) {
@@ -38,6 +39,19 @@ func (jc *JobController) AddJob(event tool.Event) {
 		return
 	}
 	jc.queue.Push(job)
+}
+
+func (jc *JobController) DeleteJob(event tool.Event) {
+	fmt.Println("[jobcontroller][DeleteJob] delete job")
+	var job *core.Job
+	val := jc.JobInformer.Get(event.Key)
+	jc.JobInformer.Delete(event.Key)
+	err := json.Unmarshal([]byte(val), &job)
+	if err != nil {
+		fmt.Println("[jobcontroller] delete job error")
+		return
+	}
+	tool.DeletePod(job.Name)
 }
 
 func (jc *JobController) worker() {

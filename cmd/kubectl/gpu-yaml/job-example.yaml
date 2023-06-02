@@ -14,4 +14,4 @@ spec:
     error: cuda.err # 错误输出文件
     mail-type: end # 邮件通知（任务结束后发送邮件通知）
     mail-user: jmhuang_2020@sjtu.edu.cn # 邮箱地址
-    program: gpu-yaml/cuda.cu # 运行的cuda程序
+    program: ./cmd/kubectl/gpu-yaml/cuda.cu # 运行的cuda程序

@@ -2,10 +2,11 @@ package delete
 
 import (
 	"fmt"
-	"github.com/spf13/cobra"
 	"minik8s/cmd/kube-apiserver/app/apiconfig"
 	"minik8s/pkg/util/web"
 	"net/url"
+
+	"github.com/spf13/cobra"
 )
 
 // DeleteOptions is the commandline options for 'delete' sub command
@@ -69,6 +70,14 @@ func (o *DeleteOptions) RunDelete(cmd *cobra.Command, args []string) error {
 	case "dns":
 		{
 			return o.RunDeleteDNS(cmd, args)
+		}
+	case "job":
+		{
+			return o.RunDeleteJob(cmd, args)
+		}
+	case "function":
+		{
+			return o.RunDeleteFunction(cmd, args)
 		}
 	default:
 		{
@@ -189,5 +198,49 @@ func (o *DeleteOptions) RunDeleteHPA(cmd *cobra.Command, args []string) error {
 	}
 
 	fmt.Println("hpa Delete successfully")
+	return nil
+}
+
+func (o *DeleteOptions) RunDeleteJob(cmd *cobra.Command, args []string) error {
+	prefix := "[kubectl] [delete] [RunDeleteJob] "
+	values := url.Values{}
+	if o.DeleteAll {
+		values.Add("all", "true")
+	}
+	if len(args) > 1 {
+		values.Add("JobName", args[1])
+		//body = bytes.NewBuffer([]byte(args[1]))
+	}
+
+	err := web.SendHttpRequest("DELETE", apiconfig.Server_URL+apiconfig.JOB_PATH+"?"+values.Encode(),
+		web.WithPrefix(prefix),
+		web.WithLog(true))
+	if err != nil {
+		return err
+	}
+
+	fmt.Println("job Delete successfully")
+	return nil
+}
+
+func (o *DeleteOptions) RunDeleteFunction(cmd *cobra.Command, args []string) error {
+	prefix := "[kubectl] [delete] [DeleteHPA] "
+	values := url.Values{}
+	if o.DeleteAll {
+		values.Add("all", "true")
+	}
+	if len(args) > 1 {
+		values.Add("FunctionName", args[1])
+		//body = bytes.NewBuffer([]byte(args[1]))
+	}
+
+	err := web.SendHttpRequest("DELETE", apiconfig.Server_URL+apiconfig.FUNCTION_PATH+"?"+values.Encode(),
+		web.WithPrefix(prefix),
+		web.WithLog(true))
+	if err != nil {
+		return err
+	}
+
+	fmt.Println("function Delete successfully")
 	return nil
 }

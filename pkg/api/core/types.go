@@ -607,3 +607,18 @@ type Path struct {
 	Ip      string `json:"ip" yaml:"ip"`           // actual serviceIp
 	Port    string `yaml:"port" json:"port"`       // service's port
 }
+
+type Function struct {
+	metav1.TypeMeta   `json:",inline" yaml:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty" yaml:"metadata,omitempty"`
+	Spec              FunctionSpec `json:"spec,omitempty" yaml:"spec,omitempty"`
+}
+
+type FunctionSpec struct {
+	// Image is the docker image of the function
+	// image_name := my_module:function_name
+	Image         string `json:"image" yaml:"image"`
+	FileDirectory string `json:"fileDirectory" yaml:"fileDirectory"`
+	Pods          []Pod  `json:"pods" yaml:"pods"`
+	InvokeTimes   int    `json:"invokeTimes" yaml:"invokeTimes"`
+}

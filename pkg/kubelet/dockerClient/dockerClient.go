@@ -7,20 +7,22 @@ package dockerClient
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
-
-	"minik8s/pkg/api/core"
-	"minik8s/pkg/kubelet/config"
-
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/mount"
 	"github.com/docker/docker/api/types/volume"
 	"github.com/docker/docker/client"
+	"github.com/docker/docker/pkg/archive"
 	"github.com/docker/go-connections/nat"
+	"github.com/mitchellh/go-homedir"
 	"io"
 	kube_proxy "minik8s/configs"
+	"minik8s/pkg/api/core"
+	"minik8s/pkg/kubelet/config"
+	"os"
 )
 
 func GetNewClient() (*client.Client, error) {
@@ -575,4 +577,86 @@ func GetDockerStats(name string) (types.ContainerStats, error) {
 		}
 	}
 	return types.ContainerStats{}, fmt.Errorf("no such container")
+}
+
+func GetContext(filePath string) io.Reader {
+	// Use homedir.Expand to resolve paths like '~/repos/myrepo'
+	filePath, _ = homedir.Expand(filePath)
+	ctx, _ := archive.TarWithOptions(filePath, &archive.TarOptions{})
+	return ctx
+}
+
+func ImageBuild(buildPath string, image string) error {
+	ctx := context.Background()
+	cli, err := GetNewClient()
+	if err != nil {
+		fmt.Println("Docker client init failed.", err)
+		return err
+	}
+
+	// 准备构建参数
+	buildOptions := types.ImageBuildOptions{
+		Dockerfile: "Dockerfile",
+		Tags:       []string{image},
+	}
+
+	// 发起构建请求
+	buildResponse, err := cli.ImageBuild(ctx, GetContext(buildPath), buildOptions)
+	if err != nil {
+		fmt.Println("Docker build failed.", err)
+		return err
+	}
+	defer buildResponse.Body.Close()
+
+	bodyBytes, err := io.ReadAll(buildResponse.Body)
+	if err != nil {
+		fmt.Println("Error:", err)
+		return err
+	}
+
+	bodyString := string(bodyBytes)
+	fmt.Println(bodyString)
+
+	fmt.Println("Docker build completed.")
+	return nil
+}
+
+func ImagePush(image string) error {
+	ctx := context.Background()
+	cli, err := GetNewClient()
+	if err != nil {
+		fmt.Println("Docker client init failed.", err)
+		return err
+	}
+
+	var authConfig = types.AuthConfig{
+		Username: "luhaoqi",
+		Password: os.Getenv("DOCKER_TOKEN"),
+	}
+	authConfigBytes, _ := json.Marshal(authConfig)
+	authConfigEncoded := base64.URLEncoding.EncodeToString(authConfigBytes)
+
+	opts := types.ImagePushOptions{RegistryAuth: authConfigEncoded}
+
+	buildResponse, err := cli.ImagePush(ctx, image, opts)
+	if err != nil {
+		return err
+	}
+
+	defer buildResponse.Close()
+
+	bodyBytes, err := io.ReadAll(buildResponse)
+	if err != nil {
+		fmt.Println("Error:", err)
+		return err
+	}
+
+	bodyString := string(bodyBytes)
+	fmt.Println(bodyString)
+	fmt.Println("Docker push completed.")
+	return nil
+}
+
+func ImageRemove(name string) error {
+	return nil
 }

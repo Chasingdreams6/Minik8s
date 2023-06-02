@@ -25,9 +25,10 @@ type Kubelet struct {
 	Monitor      *monitor.Monitor
 	PodInformer  informer.Informer
 	NodeInformer informer.Informer
-	node         core.Node
-	workers      map[string]time.Time
-	masterIp     string
+	//FunctionInformer informer.Informer
+	node     core.Node
+	workers  map[string]time.Time
+	masterIp string
 }
 
 func NewKubelet(name string, nodeIp string, masterIp string) (*Kubelet, error) {
@@ -50,11 +51,12 @@ func NewKubelet(name string, nodeIp string, masterIp string) (*Kubelet, error) {
 		return nil, err
 	}
 	return &Kubelet{
-		Monitor:      monitor.NewMonitor(9400, &node),
-		PodInformer:  informer.NewInformer(apiconfig.POD_PATH),
+		Monitor:     monitor.NewMonitor(9400, &node),
+		PodInformer: informer.NewInformer(apiconfig.POD_PATH),
+		//FunctionInformer: informer.NewInformer(apiconfig.FUNCTION_PATH),
+		node:         node,
 		NodeInformer: informer.NewInformer(apiconfig.NODE_PATH),
 		workers:      make(map[string]time.Time),
-		node:         node,
 		masterIp:     tmp,
 	}, nil
 }
@@ -87,7 +89,7 @@ func (k *Kubelet) MasterChecker() {
 		for _, v := range des {
 			delete(k.workers, v)
 		}
-		time.Sleep(5 * time.Second)
+		time.Sleep(10 * time.Second)
 	}
 }
 
@@ -106,12 +108,73 @@ func (k *Kubelet) Register() {
 	k.PodInformer.AddEventHandler(tool.Added, k.CreatePod)
 	k.PodInformer.AddEventHandler(tool.Modified, k.UpdatePod)
 	k.PodInformer.AddEventHandler(tool.Deleted, k.DeletePod)
+	//k.FunctionInformer.AddEventHandler(tool.Added, k.CreateFunction)
+	//k.FunctionInformer.AddEventHandler(tool.Modified, k.UpdateFunction)
+	//k.FunctionInformer.AddEventHandler(tool.Deleted, k.DeleteFunction)
 }
+
+//func (k *Kubelet) CreateFunction(event tool.Event) {
+//	prefix := "[kubelet] [CreateFunction] "
+//	// handle event
+//	fmt.Println(prefix, "event.Type: ", tool.GetTypeName(event))
+//	fmt.Println(prefix, "event.Key: ", event.Key)
+//	k.FunctionInformer.Set(event.Key, event.Val)
+//
+//}
+//
+//func (k *Kubelet) UpdateFunction(event tool.Event) {
+//	prefix := "[kubelet] [UpdateFunction] "
+//	// handle event
+//	fmt.Println(prefix, "event.Type: ", tool.GetTypeName(event))
+//	fmt.Println(prefix, "event.Key: ", event.Key)
+//	k.FunctionInformer.Set(event.Key, event.Val)
+//
+//	function := &core.Function{}
+//	err := json.Unmarshal([]byte(event.Val), function)
+//	if err != nil {
+//		fmt.Println(prefix, "json.Unmarshal err: ", err)
+//		return
+//	}
+//
+//	// 镜像会自动覆盖
+//
+//	//err = dockerClient.ImageBuild(function.Spec.FileDirectory, "luhaoqi/my_module:"+function.Name)
+//	//if err != nil {
+//	//	fmt.Println(prefix, "dockerClient.ImageBuild err: ", err)
+//	//	return
+//	//}
+//
+//	// TODO: 删除所有之前Function的容器
+//}
+//
+//func (k *Kubelet) DeleteFunction(event tool.Event) {
+//	prefix := "[kubelet] [DeleteFunction] "
+//	// handle event
+//	fmt.Println(prefix, "event.Type: ", tool.GetTypeName(event))
+//	fmt.Println(prefix, "event.Key: ", event.Key)
+//	val := k.FunctionInformer.Get(event.Key)
+//	k.FunctionInformer.Delete(event.Key)
+//
+//	function := &core.Function{}
+//	err := json.Unmarshal([]byte(val), function)
+//	if err != nil {
+//		fmt.Println(prefix, "json.Unmarshal err: ", err)
+//		return
+//	}
+//
+//	// TODO: image remove 目前还是空的
+//	err = dockerClient.ImageRemove("my_module:" + function.Name)
+//	if err != nil {
+//		fmt.Println(prefix, "dockerClient.ImageRemove err: ", err)
+//		return
+//	}
+//}
 
 // this should be a thread
 func (k *Kubelet) HandleConnection(conn net.Conn) {
 	prefix := "[Kubelet][HandleConnection]"
 	buf := make([]byte, 1024)
+	fmt.Println(prefix + "server connected a client " + conn.RemoteAddr().Network())
 	for {
 		n, err := conn.Read(buf)
 		if err != nil {
@@ -146,20 +209,25 @@ func (k *Kubelet) HeartBeatServer() {
 
 func (k *Kubelet) HeartBeatClient() { // linking and send
 	prefix := "[Kubelet][HeartBeatClient]"
-	conn, err := net.Dial("tcp", k.masterIp+":12345")
-	if err != nil {
-		fmt.Println(prefix + err.Error())
-		return
-	}
-	defer conn.Close()
+	defer func() { // handler error, not exit
+		if err := recover(); err != nil {
+			fmt.Println(err)
+			time.Sleep(2 * time.Second)
+			go k.HeartBeatClient()
+		}
+	}()
 	for {
-		fmt.Println("[Kubelet][HeartBeatClient]:" + "sent hb key:" + k.node.Name)
-		_, err := conn.Write([]byte(apiconfig.NODE_PATH + "/" + k.node.Name))
+		conn, err := net.Dial("tcp", k.masterIp+":12345")
 		if err != nil {
 			fmt.Println(prefix + err.Error())
-			continue
+		}
+		fmt.Println("[Kubelet][HeartBeatClient]:" + "sent hb key:" + k.node.Name)
+		_, err1 := conn.Write([]byte(apiconfig.NODE_PATH + "/" + k.node.Name))
+		if err1 != nil {
+			fmt.Println(prefix + err1.Error())
 		}
 		time.Sleep(5 * time.Second)
+		conn.Close()
 	}
 }
 
@@ -370,6 +438,7 @@ func (k *Kubelet) Listener(needLog bool) {
 func (k *Kubelet) Run() {
 	go k.Monitor.Run()
 	go k.PodInformer.Run()
+	//go k.FunctionInformer.Run()
 	go k.Listener(true)
 	if k.node.Labels["kind"] == "Master" {
 		go k.HeartBeatServer()

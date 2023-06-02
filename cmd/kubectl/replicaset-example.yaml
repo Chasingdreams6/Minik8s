@@ -14,17 +14,9 @@ spec:
     spec:
       containers:
         - name: my-container
-          image: nginx:latest
-          command: ["nginx", "-g", "daemon off;"]
-          resources:
-            limits:
-              cpu: "1"
-              memory: "128Mi"
+          image: chasingdreams/tinyweb:3
           ports:
             - containerPort: 80
-          volumeMounts:
-            - name: my-volume
-              mountPath: /usr/share/nginx/html
       volumes:
         - name: my-volume
           configMap:

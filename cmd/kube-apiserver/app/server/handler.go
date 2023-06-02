@@ -45,10 +45,26 @@ var HandlerTable = []Handler{
 	//job
 	{Type: "POST", Path: apiconfig.JOB_PATH, Eventhandler: AddJob},
 	{Type: "GET", Path: apiconfig.JOB_PATH, Eventhandler: GetJob},
+	{Type: "DELETE", Path: apiconfig.JOB_PATH, Eventhandler: DeleteJob},
 	{Type: "POST", Path: apiconfig.JOB_FILE_PATH, Eventhandler: AddJobFile},
 	{Type: "GET", Path: apiconfig.JOB_FILE_PATH, Eventhandler: GetJobFile},
 	//hpa
+	{Type: "GET", Path: apiconfig.HPA_PATH, Eventhandler: GetHPA},
 	{Type: "PUT", Path: apiconfig.HPA_PATH, Eventhandler: AddHPA},
 	{Type: "DELETE", Path: apiconfig.HPA_PATH, Eventhandler: DeleteHPA},
+	// workflow
+	{Type: "GET", Path: apiconfig.WORKFLOW_PATH, Eventhandler: GetWorkflow},
+	{Type: "PUT", Path: apiconfig.WORKFLOW_PATH, Eventhandler: AddWorkflow},
+	{Type: "POST", Path: apiconfig.WORKFLOW_PATH, Eventhandler: UpdateWorkflow},
+	{Type: "DELETE", Path: apiconfig.WORKFLOW_PATH, Eventhandler: DeleteWorkflow},
+	// function
+	{Type: "GET", Path: apiconfig.FUNCTION_PATH, Eventhandler: GetFunction},
+	{Type: "PUT", Path: apiconfig.FUNCTION_PATH, Eventhandler: AddFunction},
+	{Type: "DELETE", Path: apiconfig.FUNCTION_PATH, Eventhandler: DeleteFunction},
 	// watch
-	{Type: "GET", Path: "/watch/*resource", Eventhandler: Watch}}
+	{Type: "GET", Path: "/watch/*resource", Eventhandler: Watch},
+	// invoke
+	{Type: "POST", Path: "/invoke/*function_name", Eventhandler: InvokeFunction},
+	// scale up
+	{Type: "POST", Path: "/scale", Eventhandler: ScaleFunction},
+}

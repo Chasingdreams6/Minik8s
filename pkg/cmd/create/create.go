@@ -9,7 +9,9 @@ import (
 	"io/ioutil"
 	"minik8s/cmd/kube-apiserver/app/apiconfig"
 	"minik8s/pkg/api/core"
+	"minik8s/pkg/kubelet/dockerClient"
 	"minik8s/pkg/service"
+	"minik8s/pkg/util/random"
 	"minik8s/pkg/util/web"
 	"net/http"
 	"os"
@@ -21,13 +23,15 @@ import (
 
 // CreateOptions is the commandline options for 'create' sub command
 type CreateOptions struct {
-	Filename string
+	Filename  string
+	Directory string
 }
 
 // NewCreateOptions returns an initialized CreateOptions instance
 func NewCreateOptions() *CreateOptions {
 	return &CreateOptions{
-		Filename: "",
+		Filename:  "",
+		Directory: "",
 	}
 }
 
@@ -36,7 +40,7 @@ func NewCmdCreate() *cobra.Command {
 	o := NewCreateOptions()
 
 	cmd := &cobra.Command{
-		Use:   "create [-f FILENAME]",
+		Use:   "create [-f FILENAME] [-d DIRECTORY]",
 		Short: "Create a resource from a file or from stdin",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if o.Filename == "" {
@@ -54,6 +58,7 @@ func NewCmdCreate() *cobra.Command {
 
 	usage := "to use to create the resource"
 	cmd.Flags().StringVarP(&o.Filename, "filename", "f", "", "filename "+usage)
+	cmd.Flags().StringVarP(&o.Directory, "directory", "d", "", "directory "+usage)
 
 	return cmd
 }
@@ -101,6 +106,10 @@ func (o *CreateOptions) RunCreate(cmd *cobra.Command, args []string) error {
 		err = o.RunCreateHorizontalPodAutoscaler(cmd, args, yamlFile)
 	case "DNS":
 		err = o.RunCreateDNS(cmd, args, yamlFile)
+	case "Workflow":
+		err = o.RunCreateWorkflow(cmd, args, yamlFile)
+	case "Function":
+		err = o.RunCreateFunction(cmd, args, yamlFile)
 	}
 
 	if err != nil {
@@ -204,15 +213,77 @@ func (o *CreateOptions) RunCreateHorizontalPodAutoscaler(cmd *cobra.Command, arg
 	return nil
 }
 
-func CreateService(s *service.Service) error {
-	data, err := json.Marshal(s)
+func (o *CreateOptions) RunCreateWorkflow(cmd *cobra.Command, args []string, yamlFile []byte) error {
+	workflow := &core.Workflow{}
+	err := yaml.Unmarshal(yamlFile, workflow)
 	if err != nil {
-		fmt.Println("[kubectl] [create] [RunCreateService] failed to marshal:", err)
+		return err
+	}
+	err = CreateWorkflow(workflow)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (o *CreateOptions) RunCreateFunction(cmd *cobra.Command, args []string, yamlFile []byte) error {
+	function := &core.Function{}
+	err := yaml.Unmarshal(yamlFile, function)
+	if err != nil {
+		return err
+	}
+
+	function.Spec.FileDirectory = o.Directory
+	function.Spec.Image = "luhaoqi/my_module-" + function.Name + ":" + random.GenerateRandomString(4)
+
+	err = CreateFunction(function)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func CreateFunction(function *core.Function) error {
+	prefix := "[kubectl] [create] [CreateFunction] "
+	data, err := json.Marshal(function)
+	if err != nil {
+		fmt.Println("[kubectl] [create] [CreateFunction] failed to marshal:", err)
 	} else {
 		//fmt.Println("[kubectl] [create] [RunCreateReplicaSet] ", string(data))
 	}
+	err = web.SendHttpRequest("PUT", apiconfig.Server_URL+apiconfig.FUNCTION_PATH,
+		web.WithPrefix("[kubectl] [create] [CreateFunction] "),
+		web.WithBody(bytes.NewBuffer(data)),
+		web.WithLog(true))
+	if err != nil {
+		return err
+	}
+
+	image := function.Spec.Image
+
+	err = dockerClient.ImageBuild(function.Spec.FileDirectory, image)
+	if err != nil {
+		fmt.Println(prefix, "dockerClient.ImageBuild err: ", err)
+		return err
+	}
+
+	err = dockerClient.ImagePush(image)
+	if err != nil {
+		fmt.Println(prefix, "dockerClient.ImagePush err: ", err)
+		return err
+	}
+
+	return nil
+}
+
+func CreateService(s *service.Service) error {
+	data, err := json.Marshal(s)
+	if err != nil {
+		fmt.Println("[kubectl] [create] [CreateService] failed to marshal:", err)
+	} else {
+	}
 	err = web.SendHttpRequest("PUT", apiconfig.Server_URL+apiconfig.SERVICE_PATH,
-		web.WithPrefix("[kubectl] [create] [RunCreatesService] "),
+		web.WithPrefix("[kubectl] [create] [CreatesService] "),
 		web.WithBody(bytes.NewBuffer(data)),
 		web.WithLog(true))
 	if err != nil {
@@ -326,6 +397,41 @@ func CreateHPA(hpa *core.HPA) error {
 	}
 	err = web.SendHttpRequest("PUT", apiconfig.Server_URL+apiconfig.HPA_PATH,
 		web.WithPrefix("[kubectl] [create] [RunCreateHPA] "),
+		web.WithBody(bytes.NewBuffer(data)),
+		web.WithLog(true))
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func CreateWorkflow(workflow *core.Workflow) error {
+	if workflow.Spec.InputData != "" {
+		inputdata, err := ioutil.ReadFile(workflow.Spec.InputData)
+		if err != nil {
+			return fmt.Errorf("read program error")
+		}
+		var inputs map[string]interface{}
+		err = yaml.Unmarshal(inputdata, &inputs)
+		if err != nil {
+			return fmt.Errorf("unmarshal input error")
+		}
+		data, err := json.Marshal(inputs)
+		if err != nil {
+			return fmt.Errorf("marshal input error")
+		}
+		fmt.Println("[kubectl] [create] [RunCreateWorkflow] ", string(data))
+		workflow.Spec.Input = string(data)
+	}
+	data, err := json.Marshal(workflow)
+	if err != nil {
+		fmt.Println("[kubectl] [create] [RunCreateWorkflow] failed to marshal:", err)
+	} else {
+		fmt.Println("[kubectl] [create] [RunCreateWorkflow] ", string(data))
+		// fmt.Println("[kubectl] [create] [RunCreateWorkflow] ", workflow.Spec.States[1].Choices[1].Condition.Operator)
+	}
+	err = web.SendHttpRequest("PUT", apiconfig.Server_URL+apiconfig.WORKFLOW_PATH,
+		web.WithPrefix("[kubectl] [create] [RunCreateWorkflow] "),
 		web.WithBody(bytes.NewBuffer(data)),
 		web.WithLog(true))
 	if err != nil {

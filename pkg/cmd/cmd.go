@@ -6,6 +6,7 @@ import (
 	"minik8s/pkg/cmd/create"
 	"minik8s/pkg/cmd/delete"
 	"minik8s/pkg/cmd/get"
+	"minik8s/pkg/cmd/invoke"
 )
 
 // NewKubectlCommand creates the `kubectl` command and its nested children.
@@ -18,5 +19,6 @@ func NewKubectlCommand() *cobra.Command {
 	rootCmd.AddCommand(delete.NewCmdDelete())
 	rootCmd.AddCommand(get.NewCmdGet())
 	rootCmd.AddCommand(apply.NewCmdApply())
+	rootCmd.AddCommand(invoke.NewCmdInvoke())
 	return rootCmd
 }

@@ -10,6 +10,7 @@ import (
 	"minik8s/pkg/kube-apiserver/etcd"
 	"minik8s/pkg/util/random"
 	"net/http"
+	"os"
 
 	"github.com/gin-gonic/gin"
 )
@@ -100,6 +101,79 @@ func GetJob(c *gin.Context, s *Server) {
 	}
 	fmt.Println(INFO_HEAD, res)
 	c.JSON(http.StatusOK, res)
+}
+
+func DeleteJob(c *gin.Context, s *Server) {
+	prefix := "[api-server] [ReplicaSetHandler] [DeleteReplicaSet]"
+	fmt.Println(prefix)
+	err := c.Request.ParseForm()
+	if err != nil {
+		return
+	}
+	if c.Query("all") == "true" {
+		// delete the keys
+		// delete job file in /home/job
+		res, err := s.Etcdstore.GetAll(apiconfig.JOB_PATH)
+		for _, val := range res {
+			var job core.Job
+			err = json.Unmarshal([]byte(val.Value), &job)
+			if err != nil {
+				fmt.Println(prefix, err)
+				return
+			}
+			dirPath := apiconfig.JOB_FILE_DIR_PATH + "/" + job.Name
+			err := os.RemoveAll(dirPath)
+			if err != nil {
+				fmt.Println(prefix, err)
+				return
+			}
+		}
+		num, err := s.Etcdstore.DelAll(apiconfig.JOB_PATH)
+		if err != nil {
+			log.Println(err)
+			return
+		}
+		num, err = s.Etcdstore.DelAll(apiconfig.JOB_FILE_PATH)
+		if err != nil {
+			log.Println(err)
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{
+			"message":   "delete all pods successfully.",
+			"deleteNum": num,
+		})
+		return
+	}
+
+	Name := c.Query("JobName")
+	fmt.Println("JobName:", Name)
+	key := c.Request.URL.Path + "/" + Name
+	err = s.Etcdstore.Del(key)
+	if err != nil {
+		log.Println(err)
+		c.JSON(http.StatusBadRequest, gin.H{
+			"message": "delete job failed",
+			"error":   err,
+		})
+		return
+	}
+	key = apiconfig.JOB_FILE_PATH + "/" + Name
+	err = s.Etcdstore.Del(key)
+	if err != nil {
+		log.Println(err)
+		c.JSON(http.StatusBadRequest, gin.H{
+			"message": "delete job failed",
+			"error":   err,
+		})
+		return
+	}
+	if Name != "" {
+		os.RemoveAll(apiconfig.JOB_FILE_DIR_PATH + "/" + Name)
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"message":       "delete job success",
+		"deletePodName": Name,
+	})
 }
 
 func AddJobFile(c *gin.Context, s *Server) {

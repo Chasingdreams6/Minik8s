@@ -8,6 +8,7 @@ import (
 	"minik8s/pkg/client/informer"
 	"minik8s/pkg/client/tool"
 	q "minik8s/pkg/util/concurrentqueue"
+	"sort"
 	"time"
 )
 
@@ -108,6 +109,9 @@ func (s *Scheduler) GetNode() []core.Node {
 		}
 		nodes = append(nodes, node)
 	}
+	sort.Slice(nodes, func(i, j int) bool {
+		return nodes[i].Name < nodes[j].Name
+	})
 	return nodes
 }
 

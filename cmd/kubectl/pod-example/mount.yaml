@@ -1,0 +1,27 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: mnt
+  labels:
+    app: mnt
+spec:
+  containers:
+    - name: user2
+      image: chasingdreams/minor_ubuntu:v3
+      tty: true
+      command: [ "/bin/sh"]
+      volumeMounts:
+        - name: volume-007
+          mountPath: /tmp/inner_path1
+    - name: user1
+      image: chasingdreams/minor_ubuntu:v3
+      tty: true
+      command: [ "/bin/sh"]
+      volumeMounts:
+        - name: volume-007
+          mountPath: /tmp/inner_path2
+  volumes:
+    - name: volume-007
+      hostPath: /tmp/host_path
+
+

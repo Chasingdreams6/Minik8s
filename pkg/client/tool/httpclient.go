@@ -38,85 +38,76 @@ type ListRes struct {
 
 func List(resource string) []ListRes {
 	url := apiconfig.Server_URL + resource + "?all=true"
-	resp, err := http.Get(url)
-	if err != nil {
-		// handle error
-		fmt.Println("[httpclient] [List] web get error:", err)
+	for {
+		resp, err := http.Get(url)
+		if err != nil {
+			// handle error
+			fmt.Println("[httpclient] [List] web get error:", err)
+			time.Sleep(1 * time.Second)
+			continue
+		}
+		defer resp.Body.Close()
+		reader := resp.Body
+		data, err := io.ReadAll(reader)
+		if err != nil {
+			fmt.Println("[httpclient] [List] read error:", err)
+			time.Sleep(1 * time.Second)
+			continue
+		}
+		var resList []ListRes
+		err = json.Unmarshal(data, &resList)
+		if err != nil {
+			return nil
+		}
+		fmt.Println("[httpclient] [List] ", resList)
+		return resList
 	}
-	defer resp.Body.Close()
-	reader := resp.Body
-	data, err := io.ReadAll(reader)
-	if err != nil {
-		return nil
-	}
-	var resList []ListRes
-	err = json.Unmarshal(data, &resList)
-	if err != nil {
-		return nil
-	}
-	fmt.Println("[httpclient] [List] ", resList)
-	return resList
 }
 
 func Watch(resourses string) WatchInterface {
 	watcher := &watcher{}
 	watcher.resultChan = make(chan Event, 1000)
 	reader := func(wc chan<- Event) {
-		fmt.Println("[httpclient] [Watch] start watch")
-		url := apiconfig.Server_URL + "/watch" + resourses + "?prefix=true"
-		resp, err := http.Get(url)
-		if err != nil {
-			// handle error
-			fmt.Println("[httpclient] [Watch] web get error:", err)
-		}
-		defer resp.Body.Close()
-		buf := make([]byte, 40960)
-		// Need to optimize
 		for {
-			n, err := resp.Body.Read(buf)
-			if n != 0 || err != io.EOF {
-				event := Event{}
-				strings := myJson.ExtractNestedContent(string(buf[:n]))
-				for _, s := range strings {
-					if len(s) > 0 {
-						err = json.Unmarshal([]byte(s), &event)
-						if err != nil {
-							fmt.Println("[httpclient] [Watch] unmarshal:", err)
-							continue
-						}
-						fmt.Println("[httpclient] [Watch] unmarshal:", event.Key, event.Val, event.Type)
-						wc <- event
-					}
-				}
-			} else {
-				fmt.Println("[httpclient] [Watch] break")
-				break
+			fmt.Println("[httpclient] [Watch] start watch")
+			url := apiconfig.Server_URL + "/watch" + resourses + "?prefix=true"
+			resp, err := http.Get(url)
+			buf := make([]byte, 40960)
+			if err != nil {
+				// handle error
+				fmt.Println("[httpclient] [Watch] web get error:", err)
+				goto Reconnect
 			}
+			defer resp.Body.Close()
+			// Need to optimize
+			for {
+				n, err := resp.Body.Read(buf)
+				if n != 0 {
+					event := Event{}
+					strings := myJson.ExtractNestedContent(string(buf[:n]))
+					for _, s := range strings {
+						if len(s) > 0 {
+							err = json.Unmarshal([]byte(s), &event)
+							if err != nil {
+								fmt.Println("[httpclient] [Watch] unmarshal:", err)
+								continue
+							}
+							fmt.Println("[httpclient] [Watch] unmarshal:", event.Key, event.Val, event.Type)
+							// send event to watcher.resultChan
+							wc <- event
+						}
+					}
+				} else {
+					fmt.Println("[httpclient] [Watch] break", err)
+					goto Reconnect
+				}
+				time.Sleep(1 * time.Second)
+			}
+			//todo : try to reconnect
+		Reconnect:
+			fmt.Println("[httpclient] [Watch] try to reconnect")
 			time.Sleep(1 * time.Second)
 		}
-		// This doesn't work(don't know why)
-		// reader := bufio.NewReader(resp.Body)
-		// for {
-		// 	line, err := reader.ReadString('\n')
-		// 	if len(line) > 0 {
-		// 		fmt.Println("[httpclient] [Watch] getline")
-		// 		// handle Watch Response
-		// 		fmt.Println("[httpclient] [Watch] ", line)
-		// 		event := Event{}
-		// 		// json.Unmarshal([]byte(line), &event)
-		// 		// TO DO: send event to watcher.resultChan
-		// 		wc <- event
-		// 	}
-		// 	if err == io.EOF {
-		// 		break
-		// 	}
-		// 	if err != nil {
-		// 		// disconnect , cause watch is controlled by client,should try to reconnect
-		// 		// TO DO: reconnect
-		// 		fmt.Println("[httpclient] [Watch] break")
-		// 		break
-		// 	}
-		// }
 	}
 	go reader(watcher.resultChan)
 	return watcher
@@ -190,20 +181,27 @@ func AddNode(node *core.Node) error {
 	if err != nil {
 		return err
 	}
-	req, err := http.NewRequest("PUT", url, bytes.NewBuffer(data))
-	if err != nil {
-		return err
-	}
+	for {
+		req, err := http.NewRequest("PUT", url, bytes.NewBuffer(data))
+		if err != nil {
+			time.Sleep(1 * time.Second)
+			continue
+		}
 
-	// 发送请求
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	defer resp.Body.Close()
-	err = log.CheckHttpStatus("[httpclient] [AddNode] ", resp)
-	if err != nil {
-		return err
+		// 发送请求
+		client := &http.Client{}
+		resp, err := client.Do(req)
+		if err != nil {
+			time.Sleep(1 * time.Second)
+			continue
+		}
+		defer resp.Body.Close()
+		err = log.CheckHttpStatus("[httpclient] [AddNode] ", resp)
+		if err != nil {
+			return err
+		}
+		return nil
 	}
-	return nil
 }
 func GetService(name string) (*service.Service, error) {
 	prefix := "[tool][GetService]"
@@ -343,6 +341,22 @@ func GetPod(name string) (*core.Pod, error) {
 		return &pod, nil
 	}
 	return &core.Pod{}, fmt.Errorf("no such pod")
+}
+
+func UpdateDag(dag *core.DAG) error {
+	url := apiconfig.Server_URL + apiconfig.WORKFLOW_PATH
+	fmt.Println("[tool][updateDAG]: url=" + url)
+	data, err := json.Marshal(dag)
+	if err != nil {
+		return err
+	}
+	resp, err := http.Post(url, "application/json", bytes.NewBuffer(data))
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	fmt.Println("Response Status:", resp.Status)
+	return nil
 }
 
 func DeleteNode(key string) {

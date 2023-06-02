@@ -1,4 +1,0 @@
-Flask==2.3.2
-importlib==1.0.4
-requests
-request

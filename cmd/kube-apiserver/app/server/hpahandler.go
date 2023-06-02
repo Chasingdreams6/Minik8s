@@ -7,10 +7,50 @@ import (
 	"log"
 	"minik8s/cmd/kube-apiserver/app/apiconfig"
 	"minik8s/pkg/api/core"
+	"minik8s/pkg/kube-apiserver/etcd"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
 )
+
+func GetHPA(c *gin.Context, s *Server) {
+	prefix := "[api-server] [functionHandler] [GetHPA]"
+	fmt.Println(prefix)
+	if c.Query("all") == "true" {
+		// delete the keys
+		res, err := s.Etcdstore.GetWithPrefix(apiconfig.HPA_PATH)
+		if err != nil {
+			log.Println(err)
+			return
+		}
+		c.JSON(http.StatusOK, res)
+		return
+	}
+
+	HPAName := c.Query("Name")
+	key := c.Request.URL.Path + "/" + string(HPAName)
+
+	var res []etcd.ListRes
+	var err error
+
+	if c.Query("prefix") == "true" {
+		res, err = s.Etcdstore.GetWithPrefix(key)
+		fmt.Println(res)
+	} else {
+		res, err = s.Etcdstore.GetExact(key)
+	}
+
+	if err != nil {
+		log.Println(err)
+		c.JSON(http.StatusBadRequest, gin.H{
+			"message": "etcd get HPA failed",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, res)
+
+}
 
 func AddHPA(c *gin.Context, s *Server) {
 	val, _ := io.ReadAll(c.Request.Body)

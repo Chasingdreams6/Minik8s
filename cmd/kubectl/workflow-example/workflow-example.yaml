@@ -1,0 +1,38 @@
+apiVersion: apps/v1
+kind: Workflow
+metadata:
+  name: my-workflow
+spec:
+  InputData : ./cmd/kubectl/workflow-example/input.yaml
+  states:
+    - Name: StartState 
+      Type: Input
+      Next: branchstate
+    - Name: branchstate
+      Type: Choice
+      Choices:
+        - Condition:
+            Type: Numeric
+            Variable: x
+            Operator: ">"
+            Value: 10
+          Next: Function1
+        - Condition:
+            Type: Numeric
+            Variable: x
+            Operator: "<="
+            Value: 10
+          Next: Function2
+    - Name: Function1
+      Type: Task
+      Resource : function1
+      Next: Function3
+    - Name: Function2
+      Type: Task
+      Resource: function2
+      Next: Function3
+    - Name: Function3
+      Type: Task
+      Resource: function3
+      End : true
+  

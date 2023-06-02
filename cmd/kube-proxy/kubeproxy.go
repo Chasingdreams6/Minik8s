@@ -1,9 +1,14 @@
 package main
 
-import kubeproxy "minik8s/pkg/kube-proxy"
+import (
+	"flag"
+	kubeproxy "minik8s/pkg/kube-proxy"
+)
 
 func main() {
-	proxy := kubeproxy.NewKubeProxy()
+	MasterIP := flag.String("masterip", "", "master ip")
+	flag.Parse()
+	proxy := kubeproxy.NewKubeProxy(*MasterIP)
 	proxy.Register()
 	proxy.Run()
 	select {}
